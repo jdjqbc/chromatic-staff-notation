@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chromatic Staff Notation</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Chromatic Staff Notation</h1>
+            <p>Click on the staff to add notes and hear them play instantly</p>
+        </header>
+        
+        <main>
+            <div class="staff-container">
+                <canvas id="staff-canvas" width="800" height="300"></canvas>
+            </div>
+            
+            <div class="controls">
+                <button id="clear-btn">Clear All</button>
+                <button id="play-sequence-btn">Play Sequence</button>
+            </div>
+        </main>
+    </div>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
