@@ -4,9 +4,10 @@ class ChromaticStaff {
         this.notes = [];
         this.audioReady = false;
         
-        // Staff configuration
+        // Chromatic staff configuration
         this.staffLines = 5;
         this.lineSpacing = 20;
+        this.semitoneSpacing = 10; // Each semitone = 10px for chromatic staff
         this.staffTop = 80;
         this.staffLeft = 50;
         this.staffWidth = 700;
@@ -117,24 +118,24 @@ class ChromaticStaff {
     }
     
     getStaffPosition(mouseX, mouseY) {
-        // Snap to staff lines and spaces
+        // Snap to chromatic positions (each semitone)
         const relativeY = mouseY - this.staffTop;
-        const lineIndex = Math.round(relativeY / (this.lineSpacing / 2));
-        const snappedY = this.staffTop + (lineIndex * (this.lineSpacing / 2));
+        const semitoneIndex = Math.round(relativeY / this.semitoneSpacing);
+        const snappedY = this.staffTop + (semitoneIndex * this.semitoneSpacing);
         
         return {
             x: mouseX,
             y: snappedY,
-            lineIndex: lineIndex
+            semitoneIndex: semitoneIndex
         };
     }
     
-    getMidiNote(lineIndex) {
-        // Convert staff position to MIDI note
-        // Middle line (lineIndex 4) = C4 (MIDI 60)
-        // Each half-step up = +1 semitone, down = -1 semitone
-        const middleLineIndex = 4;
-        const semitoneOffset = (middleLineIndex - lineIndex);
+    getMidiNote(semitoneIndex) {
+        // Convert chromatic staff position to MIDI note
+        // Middle line (semitoneIndex 4) = C4 (MIDI 60)
+        // Each visual step = 1 semitone
+        const middleSemitoneIndex = 4;
+        const semitoneOffset = (middleSemitoneIndex - semitoneIndex);
         return this.middleLineNote + semitoneOffset;
     }
     
@@ -142,14 +143,14 @@ class ChromaticStaff {
         return 440 * Math.pow(2, (midiNote - 69) / 12);
     }
     
-    addNote(x, y, lineIndex) {
-        const midiNote = this.getMidiNote(lineIndex);
+    addNote(x, y, semitoneIndex) {
+        const midiNote = this.getMidiNote(semitoneIndex);
         const frequency = this.midiToFrequency(midiNote);
         
         const note = {
             x: x,
             y: y,
-            lineIndex: lineIndex,
+            semitoneIndex: semitoneIndex,
             midiNote: midiNote,
             frequency: frequency
         };
@@ -207,7 +208,7 @@ class ChromaticStaff {
             const mouseX = e.clientX - rect.left;
             const mouseY = e.clientY - rect.top;
             
-            // Define staff boundaries (extend above and below staff lines)
+            // Define staff boundaries (extend above and below for chromatic range)
             const staffTop = this.staffTop - this.lineSpacing;
             const staffBottom = this.staffTop + (this.staffLines - 1) * this.lineSpacing + this.lineSpacing;
             
@@ -215,7 +216,7 @@ class ChromaticStaff {
             if (mouseX >= this.staffLeft && mouseX <= this.staffLeft + this.staffWidth &&
                 mouseY >= staffTop && mouseY <= staffBottom) {
                 const position = this.getStaffPosition(mouseX, mouseY);
-                this.addNote(position.x, position.y, position.lineIndex);
+                this.addNote(position.x, position.y, position.semitoneIndex);
             }
         });
         
