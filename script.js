@@ -16,8 +16,9 @@ class ChromaticStaff {
         
         // SMuFL Unicode for musical symbols
         this.symbols = {
-            noteheadBlack: '\uE0A4',  // Black notehead
+            noteheadBlack: '\uE0A4',  // Black notehead - SMuFL
             staff5Lines: '\uE014',    // 5-line staff
+            fallbackNote: '●',       // Fallback if font doesn't load
         };
         
         this.init();
@@ -27,6 +28,26 @@ class ChromaticStaff {
         this.drawStaff();
         this.setupEventListeners();
         this.initAudio();
+        this.checkFontLoading();
+    }
+    
+    async checkFontLoading() {
+        try {
+            await document.fonts.load('40px Bravura');
+            console.log('Bravura font loaded successfully');
+            this.enableMusicSymbols();
+        } catch (error) {
+            console.log('Bravura font failed to load, using fallback symbols');
+        }
+    }
+    
+    enableMusicSymbols() {
+        // Switch from ellipse to SMuFL symbols
+        const ellipses = this.svg.querySelectorAll('ellipse');
+        const symbols = this.svg.querySelectorAll('.music-symbol');
+        
+        ellipses.forEach(ellipse => ellipse.style.display = 'none');
+        symbols.forEach(symbol => symbol.style.display = 'block');
     }
     
     async initAudio() {
@@ -72,16 +93,26 @@ class ChromaticStaff {
         const noteGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
         noteGroup.setAttribute('class', 'note');
         
-        // Create text element for the note symbol
+        // Create ellipse as fallback and primary note symbol
+        const noteEllipse = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+        noteEllipse.setAttribute('cx', x);
+        noteEllipse.setAttribute('cy', y);
+        noteEllipse.setAttribute('rx', '8');
+        noteEllipse.setAttribute('ry', '6');
+        noteEllipse.setAttribute('fill', '#000');
+        noteGroup.appendChild(noteEllipse);
+        
+        // Also add the SMuFL symbol for future enhancement
         const noteSymbol = document.createElementNS('http://www.w3.org/2000/svg', 'text');
         noteSymbol.setAttribute('x', x);
-        noteSymbol.setAttribute('y', y + 6); // Offset for better alignment
+        noteSymbol.setAttribute('y', y + 6);
         noteSymbol.setAttribute('text-anchor', 'middle');
         noteSymbol.setAttribute('dominant-baseline', 'central');
         noteSymbol.setAttribute('class', 'music-symbol');
+        noteSymbol.setAttribute('style', 'display: none;'); // Hidden for now
         noteSymbol.textContent = this.symbols.noteheadBlack;
-        
         noteGroup.appendChild(noteSymbol);
+        
         this.svg.appendChild(noteGroup);
     }
     

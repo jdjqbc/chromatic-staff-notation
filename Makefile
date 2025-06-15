@@ -24,6 +24,7 @@ build: ## Build for production (copy files to dist)
 	cp index.html dist/
 	cp script.js dist/
 	cp styles.css dist/
+	cp -r fonts dist/ 2>/dev/null || true
 	cp -r docs dist/ 2>/dev/null || true
 
 terraform-init: ## Initialize Terraform
