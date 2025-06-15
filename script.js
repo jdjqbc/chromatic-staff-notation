@@ -1,7 +1,6 @@
 class ChromaticStaff {
-    constructor(canvasId) {
-        this.canvas = document.getElementById(canvasId);
-        this.ctx = this.canvas.getContext('2d');
+    constructor(svgId) {
+        this.svg = document.getElementById(svgId);
         this.notes = [];
         this.audioReady = false;
         
@@ -14,6 +13,12 @@ class ChromaticStaff {
         
         // Pitch mapping: middle line (3rd line) = C4
         this.middleLineNote = 60; // MIDI note number for C4
+        
+        // SMuFL Unicode for musical symbols
+        this.symbols = {
+            noteheadBlack: '\uE0A4',  // Black notehead
+            staff5Lines: '\uE014',    // 5-line staff
+        };
         
         this.init();
     }
@@ -35,19 +40,27 @@ class ChromaticStaff {
     }
     
     drawStaff() {
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        // Clear existing content
+        this.svg.innerHTML = '';
+        
+        // Create staff group
+        const staffGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        staffGroup.setAttribute('id', 'staff-lines');
         
         // Draw staff lines
-        this.ctx.strokeStyle = '#000';
-        this.ctx.lineWidth = 1;
-        
         for (let i = 0; i < this.staffLines; i++) {
             const y = this.staffTop + (i * this.lineSpacing);
-            this.ctx.beginPath();
-            this.ctx.moveTo(this.staffLeft, y);
-            this.ctx.lineTo(this.staffLeft + this.staffWidth, y);
-            this.ctx.stroke();
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', this.staffLeft);
+            line.setAttribute('y1', y);
+            line.setAttribute('x2', this.staffLeft + this.staffWidth);
+            line.setAttribute('y2', y);
+            line.setAttribute('stroke', '#000');
+            line.setAttribute('stroke-width', '1');
+            staffGroup.appendChild(line);
         }
+        
+        this.svg.appendChild(staffGroup);
         
         // Draw notes
         this.notes.forEach(note => {
@@ -56,10 +69,20 @@ class ChromaticStaff {
     }
     
     drawNote(x, y) {
-        this.ctx.fillStyle = '#000';
-        this.ctx.beginPath();
-        this.ctx.ellipse(x, y, 8, 6, 0, 0, 2 * Math.PI);
-        this.ctx.fill();
+        const noteGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        noteGroup.setAttribute('class', 'note');
+        
+        // Create text element for the note symbol
+        const noteSymbol = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        noteSymbol.setAttribute('x', x);
+        noteSymbol.setAttribute('y', y + 6); // Offset for better alignment
+        noteSymbol.setAttribute('text-anchor', 'middle');
+        noteSymbol.setAttribute('dominant-baseline', 'central');
+        noteSymbol.setAttribute('class', 'music-symbol');
+        noteSymbol.textContent = this.symbols.noteheadBlack;
+        
+        noteGroup.appendChild(noteSymbol);
+        this.svg.appendChild(noteGroup);
     }
     
     getStaffPosition(mouseX, mouseY) {
@@ -133,9 +156,23 @@ class ChromaticStaff {
         });
     }
     
+    exportSVG() {
+        const svgData = new XMLSerializer().serializeToString(this.svg);
+        const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+        const svgUrl = URL.createObjectURL(svgBlob);
+        
+        const downloadLink = document.createElement('a');
+        downloadLink.href = svgUrl;
+        downloadLink.download = 'chromatic-staff-notation.svg';
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+        URL.revokeObjectURL(svgUrl);
+    }
+    
     setupEventListeners() {
-        this.canvas.addEventListener('click', (e) => {
-            const rect = this.canvas.getBoundingClientRect();
+        this.svg.addEventListener('click', (e) => {
+            const rect = this.svg.getBoundingClientRect();
             const mouseX = e.clientX - rect.left;
             const mouseY = e.clientY - rect.top;
             
@@ -158,10 +195,14 @@ class ChromaticStaff {
         document.getElementById('play-sequence-btn').addEventListener('click', () => {
             this.playSequence();
         });
+        
+        document.getElementById('export-svg-btn').addEventListener('click', () => {
+            this.exportSVG();
+        });
     }
 }
 
 // Initialize the app when the page loads
 document.addEventListener('DOMContentLoaded', () => {
-    const staff = new ChromaticStaff('staff-canvas');
+    const staff = new ChromaticStaff('staff-svg');
 });
