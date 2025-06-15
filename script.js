@@ -126,46 +126,32 @@ class ChromaticStaffVexFlow {
     drawNotes() {
         if (this.notes.length === 0) return;
         
+        console.log('Drawing', this.notes.length, 'notes'); // Debug logging
+        
         try {
-            // Convert our notes to VexFlow format
-            const vexNotes = this.notes.map(note => this.createVexFlowNote(note));
-            
-            if (vexNotes.length === 0) return;
-            
-            // Create voice and add notes - VexFlow 5.0.0 syntax
-            this.voice = new Voice({ num_beats: 4, beat_value: 4 });
-            this.voice.addTickables(vexNotes);
-            
-            // Format and draw
-            const formatter = new Formatter().joinVoices([this.voice]);
-            formatter.format([this.voice], this.staffWidth - 160);
-            
-            this.voice.draw(this.context, this.stave);
+            // Draw notes individually for now - simpler approach for VexFlow 5.0.0
+            this.notes.forEach((note, index) => {
+                this.drawSingleNote(note, index);
+            });
         } catch (error) {
             console.error('Error drawing notes:', error);
         }
     }
     
-    createVexFlowNote(note) {
+    drawSingleNote(note, index) {
         try {
-            // Convert our chromatic note to VexFlow note
-            const pitch = this.midiToPitch(note.midiNote);
-            const vexNote = new StaveNote({
-                clef: 'treble',
-                keys: [pitch],
-                duration: 'q'  // Quarter note
-            });
+            console.log('Drawing note at position:', note.x, note.y); // Debug logging
             
-            // Handle accidentals for chromatic notes
-            const noteIndex = note.midiNote % 12;
-            if ([1, 3, 6, 8, 10].includes(noteIndex)) { // Sharp notes
-                vexNote.addModifier(new VexFlow.Accidental('#'), 0);
-            }
+            // For now, draw a simple circle to ensure visibility
+            this.context.save();
+            this.context.setFillStyle('#000');
+            this.context.beginPath();
+            this.context.arc(note.x, note.y, 6, 0, 2 * Math.PI);
+            this.context.fill();
+            this.context.restore();
             
-            return vexNote;
         } catch (error) {
-            console.error('Error creating VexFlow note:', error);
-            return null;
+            console.error('Error drawing single note:', error);
         }
     }
     
@@ -212,6 +198,7 @@ class ChromaticStaffVexFlow {
         };
         
         this.notes.push(note);
+        console.log('Added note:', note); // Debug logging
         this.playNote(note.frequency);
         this.drawStaff(); // Redraw with new note
         
