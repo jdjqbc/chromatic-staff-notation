@@ -53,9 +53,16 @@ header p {
     display: block;
 }
 
+/* VexFlow 5.0.0 Font Loading */
 @font-face {
     font-family: 'Bravura';
-    src: url('fonts/Bravura.woff2') format('woff2');
+    src: url('https://cdn.jsdelivr.net/npm/@vexflow-fonts/bravura/bravura.woff2') format('woff2');
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Academico';
+    src: url('https://cdn.jsdelivr.net/npm/@vexflow-fonts/academico/academico.woff2') format('woff2');
     font-display: swap;
 }
 

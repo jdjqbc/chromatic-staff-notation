@@ -1,4 +1,5 @@
-const { Factory, Stave, StaveNote, Voice, Formatter, Renderer } = Vex.Flow;
+// VexFlow 5.0.0 API
+const { Factory, Stave, StaveNote, Voice, Formatter, Renderer } = VexFlow;
 
 class ChromaticStaffVexFlow {
     constructor(containerId) {
@@ -7,7 +8,7 @@ class ChromaticStaffVexFlow {
         this.audioReady = false;
         
         // VexFlow setup
-        this.renderer = null;
+        this.factory = null;
         this.context = null;
         this.stave = null;
         this.voice = null;
@@ -25,22 +26,39 @@ class ChromaticStaffVexFlow {
         this.init();
     }
     
-    init() {
+    async init() {
+        await this.initFonts();
         this.setupVexFlow();
         this.drawStaff();
         this.setupEventListeners();
         this.initAudio();
     }
     
+    async initFonts() {
+        // VexFlow 5.0.0 font initialization
+        try {
+            // Set the fonts for VexFlow
+            VexFlow.setFonts('Bravura', 'Academico');
+            
+            // Wait for fonts to load
+            await document.fonts.load('1em Bravura');
+            await document.fonts.load('1em Academico');
+            console.log('VexFlow fonts loaded successfully');
+        } catch (error) {
+            console.warn('Font loading failed, using fallbacks:', error);
+        }
+    }
+    
     setupVexFlow() {
         // Clear container
         this.container.innerHTML = '';
         
-        // Create VexFlow renderer
-        this.renderer = new Renderer(this.container, Renderer.Backends.SVG);
-        this.renderer.resize(800, 300);
-        this.context = this.renderer.getContext();
-        this.context.setFont('Arial', 10);
+        // Create VexFlow factory
+        this.factory = new Factory({
+            renderer: { elementId: this.container.id, width: 800, height: 300 }
+        });
+        
+        this.context = this.factory.getContext();
     }
     
     generateChromaticPositions() {
@@ -68,16 +86,16 @@ class ChromaticStaffVexFlow {
         // Clear context
         this.context.clear();
         
-        // Create staff
+        // Create staff using VexFlow 5.0.0 API
         this.stave = new Stave(this.staffLeft, this.staffTop, this.staffWidth);
         
-        // Add staff lines - VexFlow handles standard 5-line staff
+        // Add staff elements
         this.stave.addClef('treble').addTimeSignature('4/4');
         
         // Draw the staff
         this.stave.setContext(this.context).draw();
         
-        // Draw chromatic position indicators (light gray lines for spaces)
+        // Draw chromatic position indicators
         this.drawChromaticGuides();
         
         // Draw notes if any exist
@@ -112,7 +130,9 @@ class ChromaticStaffVexFlow {
             // Convert our notes to VexFlow format
             const vexNotes = this.notes.map(note => this.createVexFlowNote(note));
             
-            // Create voice and add notes
+            if (vexNotes.length === 0) return;
+            
+            // Create voice and add notes - VexFlow 5.0.0 syntax
             this.voice = new Voice({ num_beats: 4, beat_value: 4 });
             this.voice.addTickables(vexNotes);
             
@@ -127,15 +147,26 @@ class ChromaticStaffVexFlow {
     }
     
     createVexFlowNote(note) {
-        // Convert our chromatic note to VexFlow note
-        const pitch = this.midiToPitch(note.midiNote);
-        const vexNote = new StaveNote({
-            clef: 'treble',
-            keys: [pitch],
-            duration: 'q'  // Quarter note
-        });
-        
-        return vexNote;
+        try {
+            // Convert our chromatic note to VexFlow note
+            const pitch = this.midiToPitch(note.midiNote);
+            const vexNote = new StaveNote({
+                clef: 'treble',
+                keys: [pitch],
+                duration: 'q'  // Quarter note
+            });
+            
+            // Handle accidentals for chromatic notes
+            const noteIndex = note.midiNote % 12;
+            if ([1, 3, 6, 8, 10].includes(noteIndex)) { // Sharp notes
+                vexNote.addModifier(new VexFlow.Accidental('#'), 0);
+            }
+            
+            return vexNote;
+        } catch (error) {
+            console.error('Error creating VexFlow note:', error);
+            return null;
+        }
     }
     
     midiToPitch(midiNote) {
@@ -238,7 +269,7 @@ class ChromaticStaffVexFlow {
         
         const downloadLink = document.createElement('a');
         downloadLink.href = svgUrl;
-        downloadLink.download = 'chromatic-staff-notation-vexflow.svg';
+        downloadLink.download = 'chromatic-staff-notation-vexflow5.svg';
         document.body.appendChild(downloadLink);
         downloadLink.click();
         document.body.removeChild(downloadLink);
