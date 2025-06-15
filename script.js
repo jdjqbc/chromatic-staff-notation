@@ -1,54 +1,194 @@
-class ChromaticStaff {
-    constructor(svgId) {
-        this.svg = document.getElementById(svgId);
+const { Factory, Stave, StaveNote, Voice, Formatter, Renderer } = Vex.Flow;
+
+class ChromaticStaffVexFlow {
+    constructor(containerId) {
+        this.container = document.getElementById(containerId);
         this.notes = [];
         this.audioReady = false;
         
+        // VexFlow setup
+        this.renderer = null;
+        this.context = null;
+        this.stave = null;
+        this.voice = null;
+        
         // Chromatic staff configuration
-        this.staffLines = 5;
-        this.lineSpacing = 20;
-        this.semitoneSpacing = 10; // Each semitone = 10px for chromatic staff
-        this.staffTop = 80;
-        this.staffLeft = 50;
         this.staffWidth = 700;
+        this.staffHeight = 200;
+        this.staffTop = 50;
+        this.staffLeft = 50;
         
-        // Pitch mapping: middle line (3rd line) = C4
-        this.middleLineNote = 60; // MIDI note number for C4
-        
-        // SMuFL Unicode for musical symbols
-        this.symbols = {
-            noteheadBlack: '\uE0A4',  // Black notehead - SMuFL
-            staff5Lines: '\uE014',    // 5-line staff
-            fallbackNote: '●',       // Fallback if font doesn't load
-        };
+        // Pitch mapping for chromatic staff
+        this.middleLineNote = 60; // C4
+        this.chromaticPositions = this.generateChromaticPositions();
         
         this.init();
     }
     
     init() {
+        this.setupVexFlow();
         this.drawStaff();
         this.setupEventListeners();
         this.initAudio();
-        this.checkFontLoading();
     }
     
-    async checkFontLoading() {
-        try {
-            await document.fonts.load('40px Bravura');
-            console.log('Bravura font loaded successfully');
-            this.enableMusicSymbols();
-        } catch (error) {
-            console.log('Bravura font failed to load, using fallback symbols');
+    setupVexFlow() {
+        // Clear container
+        this.container.innerHTML = '';
+        
+        // Create VexFlow renderer
+        this.renderer = new Renderer(this.container, Renderer.Backends.SVG);
+        this.renderer.resize(800, 300);
+        this.context = this.renderer.getContext();
+        this.context.setFont('Arial', 10);
+    }
+    
+    generateChromaticPositions() {
+        // Generate chromatic note positions for 5-line staff
+        // In chromatic notation, each space/line represents a semitone
+        const positions = [];
+        const baseY = this.staffTop + 80; // Middle line position
+        
+        // Generate positions from top to bottom of staff area
+        for (let i = -8; i <= 8; i++) {
+            const y = baseY - (i * 6); // 6px per semitone for tight chromatic spacing
+            const midiNote = this.middleLineNote + i;
+            positions.push({
+                semitoneIndex: i,
+                y: y,
+                midiNote: midiNote,
+                frequency: this.midiToFrequency(midiNote)
+            });
+        }
+        
+        return positions;
+    }
+    
+    drawStaff() {
+        // Clear context
+        this.context.clear();
+        
+        // Create staff
+        this.stave = new Stave(this.staffLeft, this.staffTop, this.staffWidth);
+        
+        // Add staff lines - VexFlow handles standard 5-line staff
+        this.stave.addClef('treble').addTimeSignature('4/4');
+        
+        // Draw the staff
+        this.stave.setContext(this.context).draw();
+        
+        // Draw chromatic position indicators (light gray lines for spaces)
+        this.drawChromaticGuides();
+        
+        // Draw notes if any exist
+        if (this.notes.length > 0) {
+            this.drawNotes();
         }
     }
     
-    enableMusicSymbols() {
-        // Switch from ellipse to SMuFL symbols
-        const ellipses = this.svg.querySelectorAll('ellipse');
-        const symbols = this.svg.querySelectorAll('.music-symbol');
+    drawChromaticGuides() {
+        // Draw subtle guide lines for chromatic positions
+        this.context.save();
+        this.context.setStrokeStyle('#e0e0e0');
+        this.context.setLineWidth(0.5);
         
-        ellipses.forEach(ellipse => ellipse.style.display = 'none');
-        symbols.forEach(symbol => symbol.style.display = 'block');
+        this.chromaticPositions.forEach(pos => {
+            // Only draw guides for positions between staff lines
+            if (pos.semitoneIndex % 2 !== 0) {
+                this.context.beginPath();
+                this.context.moveTo(this.staffLeft + 80, pos.y);
+                this.context.lineTo(this.staffLeft + this.staffWidth - 20, pos.y);
+                this.context.stroke();
+            }
+        });
+        
+        this.context.restore();
+    }
+    
+    drawNotes() {
+        if (this.notes.length === 0) return;
+        
+        try {
+            // Convert our notes to VexFlow format
+            const vexNotes = this.notes.map(note => this.createVexFlowNote(note));
+            
+            // Create voice and add notes
+            this.voice = new Voice({ num_beats: 4, beat_value: 4 });
+            this.voice.addTickables(vexNotes);
+            
+            // Format and draw
+            const formatter = new Formatter().joinVoices([this.voice]);
+            formatter.format([this.voice], this.staffWidth - 160);
+            
+            this.voice.draw(this.context, this.stave);
+        } catch (error) {
+            console.error('Error drawing notes:', error);
+        }
+    }
+    
+    createVexFlowNote(note) {
+        // Convert our chromatic note to VexFlow note
+        const pitch = this.midiToPitch(note.midiNote);
+        const vexNote = new StaveNote({
+            clef: 'treble',
+            keys: [pitch],
+            duration: 'q'  // Quarter note
+        });
+        
+        return vexNote;
+    }
+    
+    midiToPitch(midiNote) {
+        // Convert MIDI note number to VexFlow pitch notation
+        const noteNames = ['c', 'c#', 'd', 'd#', 'e', 'f', 'f#', 'g', 'g#', 'a', 'a#', 'b'];
+        const octave = Math.floor(midiNote / 12) - 1;
+        const noteIndex = midiNote % 12;
+        const noteName = noteNames[noteIndex];
+        
+        return `${noteName}/${octave}`;
+    }
+    
+    getStaffPosition(mouseX, mouseY) {
+        // Find closest chromatic position
+        let closestPos = this.chromaticPositions[0];
+        let minDistance = Math.abs(mouseY - closestPos.y);
+        
+        for (const pos of this.chromaticPositions) {
+            const distance = Math.abs(mouseY - pos.y);
+            if (distance < minDistance) {
+                minDistance = distance;
+                closestPos = pos;
+            }
+        }
+        
+        return {
+            x: mouseX,
+            y: closestPos.y,
+            semitoneIndex: closestPos.semitoneIndex,
+            midiNote: closestPos.midiNote,
+            frequency: closestPos.frequency
+        };
+    }
+    
+    addNote(x, y, position) {
+        const note = {
+            x: x,
+            y: y,
+            semitoneIndex: position.semitoneIndex,
+            midiNote: position.midiNote,
+            frequency: position.frequency,
+            timestamp: Date.now()
+        };
+        
+        this.notes.push(note);
+        this.playNote(note.frequency);
+        this.drawStaff(); // Redraw with new note
+        
+        return note;
+    }
+    
+    midiToFrequency(midiNote) {
+        return 440 * Math.pow(2, (midiNote - 69) / 12);
     }
     
     async initAudio() {
@@ -56,110 +196,10 @@ class ChromaticStaff {
             await Tone.start();
             this.synth = new Tone.Synth().toDestination();
             this.audioReady = true;
+            console.log('Audio initialized successfully');
         } catch (error) {
             console.error('Audio initialization failed:', error);
         }
-    }
-    
-    drawStaff() {
-        // Clear existing content
-        this.svg.innerHTML = '';
-        
-        // Create staff group
-        const staffGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-        staffGroup.setAttribute('id', 'staff-lines');
-        
-        // Draw staff lines
-        for (let i = 0; i < this.staffLines; i++) {
-            const y = this.staffTop + (i * this.lineSpacing);
-            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-            line.setAttribute('x1', this.staffLeft);
-            line.setAttribute('y1', y);
-            line.setAttribute('x2', this.staffLeft + this.staffWidth);
-            line.setAttribute('y2', y);
-            line.setAttribute('stroke', '#000');
-            line.setAttribute('stroke-width', '1');
-            staffGroup.appendChild(line);
-        }
-        
-        this.svg.appendChild(staffGroup);
-        
-        // Draw notes
-        this.notes.forEach(note => {
-            this.drawNote(note.x, note.y);
-        });
-    }
-    
-    drawNote(x, y) {
-        const noteGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-        noteGroup.setAttribute('class', 'note');
-        
-        // Create ellipse as fallback and primary note symbol
-        const noteEllipse = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
-        noteEllipse.setAttribute('cx', x);
-        noteEllipse.setAttribute('cy', y);
-        noteEllipse.setAttribute('rx', '8');
-        noteEllipse.setAttribute('ry', '6');
-        noteEllipse.setAttribute('fill', '#000');
-        noteGroup.appendChild(noteEllipse);
-        
-        // Also add the SMuFL symbol for future enhancement
-        const noteSymbol = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        noteSymbol.setAttribute('x', x);
-        noteSymbol.setAttribute('y', y + 6);
-        noteSymbol.setAttribute('text-anchor', 'middle');
-        noteSymbol.setAttribute('dominant-baseline', 'central');
-        noteSymbol.setAttribute('class', 'music-symbol');
-        noteSymbol.setAttribute('style', 'display: none;'); // Hidden for now
-        noteSymbol.textContent = this.symbols.noteheadBlack;
-        noteGroup.appendChild(noteSymbol);
-        
-        this.svg.appendChild(noteGroup);
-    }
-    
-    getStaffPosition(mouseX, mouseY) {
-        // Snap to chromatic positions (each semitone)
-        const relativeY = mouseY - this.staffTop;
-        const semitoneIndex = Math.round(relativeY / this.semitoneSpacing);
-        const snappedY = this.staffTop + (semitoneIndex * this.semitoneSpacing);
-        
-        return {
-            x: mouseX,
-            y: snappedY,
-            semitoneIndex: semitoneIndex
-        };
-    }
-    
-    getMidiNote(semitoneIndex) {
-        // Convert chromatic staff position to MIDI note
-        // Middle line (semitoneIndex 4) = C4 (MIDI 60)
-        // Each visual step = 1 semitone
-        const middleSemitoneIndex = 4;
-        const semitoneOffset = (middleSemitoneIndex - semitoneIndex);
-        return this.middleLineNote + semitoneOffset;
-    }
-    
-    midiToFrequency(midiNote) {
-        return 440 * Math.pow(2, (midiNote - 69) / 12);
-    }
-    
-    addNote(x, y, semitoneIndex) {
-        const midiNote = this.getMidiNote(semitoneIndex);
-        const frequency = this.midiToFrequency(midiNote);
-        
-        const note = {
-            x: x,
-            y: y,
-            semitoneIndex: semitoneIndex,
-            midiNote: midiNote,
-            frequency: frequency
-        };
-        
-        this.notes.push(note);
-        this.playNote(frequency);
-        this.drawStaff();
-        
-        return note;
     }
     
     async playNote(frequency) {
@@ -179,8 +219,8 @@ class ChromaticStaff {
     playSequence() {
         if (this.notes.length === 0) return;
         
-        // Sort notes by x position (left to right)
-        const sortedNotes = [...this.notes].sort((a, b) => a.x - b.x);
+        // Sort notes by timestamp (order added)
+        const sortedNotes = [...this.notes].sort((a, b) => a.timestamp - b.timestamp);
         
         let time = Tone.now();
         sortedNotes.forEach((note, index) => {
@@ -189,13 +229,16 @@ class ChromaticStaff {
     }
     
     exportSVG() {
-        const svgData = new XMLSerializer().serializeToString(this.svg);
+        const svg = this.container.querySelector('svg');
+        if (!svg) return;
+        
+        const svgData = new XMLSerializer().serializeToString(svg);
         const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
         const svgUrl = URL.createObjectURL(svgBlob);
         
         const downloadLink = document.createElement('a');
         downloadLink.href = svgUrl;
-        downloadLink.download = 'chromatic-staff-notation.svg';
+        downloadLink.download = 'chromatic-staff-notation-vexflow.svg';
         document.body.appendChild(downloadLink);
         downloadLink.click();
         document.body.removeChild(downloadLink);
@@ -203,23 +246,22 @@ class ChromaticStaff {
     }
     
     setupEventListeners() {
-        this.svg.addEventListener('click', (e) => {
-            const rect = this.svg.getBoundingClientRect();
+        // Click handler for adding notes
+        this.container.addEventListener('click', (e) => {
+            const rect = this.container.getBoundingClientRect();
             const mouseX = e.clientX - rect.left;
             const mouseY = e.clientY - rect.top;
             
-            // Define staff boundaries (extend above and below for chromatic range)
-            const staffTop = this.staffTop - this.lineSpacing;
-            const staffBottom = this.staffTop + (this.staffLines - 1) * this.lineSpacing + this.lineSpacing;
-            
-            // Check if click is within staff area (both X and Y)
-            if (mouseX >= this.staffLeft && mouseX <= this.staffLeft + this.staffWidth &&
-                mouseY >= staffTop && mouseY <= staffBottom) {
+            // Check if click is within staff area
+            if (mouseX >= this.staffLeft + 80 && mouseX <= this.staffLeft + this.staffWidth - 20 &&
+                mouseY >= this.staffTop - 20 && mouseY <= this.staffTop + 150) {
+                
                 const position = this.getStaffPosition(mouseX, mouseY);
-                this.addNote(position.x, position.y, position.semitoneIndex);
+                this.addNote(position.x, position.y, position);
             }
         });
         
+        // Control buttons
         document.getElementById('clear-btn').addEventListener('click', () => {
             this.clearNotes();
         });
@@ -236,5 +278,5 @@ class ChromaticStaff {
 
 // Initialize the app when the page loads
 document.addEventListener('DOMContentLoaded', () => {
-    const staff = new ChromaticStaff('staff-svg');
+    const staff = new ChromaticStaffVexFlow('staff-svg');
 });

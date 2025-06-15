@@ -46,6 +46,11 @@ header p {
     cursor: crosshair;
     border: 1px solid #eee;
     background: white;
+    min-height: 300px;
+}
+
+#staff-svg svg {
+    display: block;
 }
 
 @font-face {
