@@ -124,9 +124,6 @@ class ChromaticStaffVexFlow {
         // Draw the staff
         this.stave.setContext(this.context).draw();
         
-        // Draw chromatic position indicators
-        this.drawChromaticGuides();
-        
         // Draw note column guides
         this.drawColumnGuides();
         
@@ -134,25 +131,6 @@ class ChromaticStaffVexFlow {
         if (this.notes.length > 0) {
             this.drawNotes();
         }
-    }
-    
-    drawChromaticGuides() {
-        // Draw subtle guide lines for chromatic positions
-        this.context.save();
-        this.context.setStrokeStyle('#e0e0e0');
-        this.context.setLineWidth(0.5);
-        
-        this.chromaticPositions.forEach(pos => {
-            // Only draw guides for positions between staff lines
-            if (pos.semitoneIndex % 2 !== 0) {
-                this.context.beginPath();
-                this.context.moveTo(this.staffLeft + 80, pos.y);
-                this.context.lineTo(this.staffLeft + this.staffWidth - 20, pos.y);
-                this.context.stroke();
-            }
-        });
-        
-        this.context.restore();
     }
     
     drawColumnGuides() {
