@@ -19,6 +19,11 @@ class ChromaticStaffVexFlow {
         this.staffTop = 50;
         this.staffLeft = 50;
         
+        // Note positioning system
+        this.noteSpacing = 60; // Horizontal space between notes
+        this.firstNoteX = this.staffLeft + 120; // Starting position for first note
+        this.noteColumns = []; // Track which columns are occupied
+        
         // Pitch mapping for chromatic staff
         this.middleLineNote = 60; // C4
         this.chromaticPositions = this.generateChromaticPositions();
@@ -82,6 +87,30 @@ class ChromaticStaffVexFlow {
         return positions;
     }
     
+    getNextNotePosition() {
+        // Find the next available horizontal position
+        const nextColumn = this.notes.length;
+        const x = this.firstNoteX + (nextColumn * this.noteSpacing);
+        
+        // Make sure we don't go past the staff boundary
+        const maxX = this.staffLeft + this.staffWidth - 80;
+        
+        if (x > maxX) {
+            // If we're running out of space, start a new "line" or compress spacing
+            const compressedSpacing = Math.min(this.noteSpacing, (maxX - this.firstNoteX) / (this.notes.length + 1));
+            return this.firstNoteX + (this.notes.length * compressedSpacing);
+        }
+        
+        return x;
+    }
+    
+    getNoteColumn(clickX) {
+        // Determine which column the user clicked in
+        const relativeX = clickX - this.firstNoteX;
+        const column = Math.round(relativeX / this.noteSpacing);
+        return Math.max(0, column);
+    }
+    
     drawStaff() {
         // Clear context
         this.context.clear();
@@ -97,6 +126,9 @@ class ChromaticStaffVexFlow {
         
         // Draw chromatic position indicators
         this.drawChromaticGuides();
+        
+        // Draw note column guides
+        this.drawColumnGuides();
         
         // Draw notes if any exist
         if (this.notes.length > 0) {
@@ -119,6 +151,28 @@ class ChromaticStaffVexFlow {
                 this.context.stroke();
             }
         });
+        
+        this.context.restore();
+    }
+    
+    drawColumnGuides() {
+        // Draw subtle vertical lines to show note column positions
+        this.context.save();
+        this.context.setStrokeStyle('#f0f0f0');
+        this.context.setLineWidth(0.5);
+        
+        // Draw guides for potential note positions
+        const maxColumns = Math.floor((this.staffWidth - 200) / this.noteSpacing) + 1;
+        
+        for (let i = 0; i < maxColumns; i++) {
+            const x = this.firstNoteX + (i * this.noteSpacing);
+            if (x < this.staffLeft + this.staffWidth - 50) {
+                this.context.beginPath();
+                this.context.moveTo(x, this.staffTop - 10);
+                this.context.lineTo(x, this.staffTop + 120);
+                this.context.stroke();
+            }
+        }
         
         this.context.restore();
     }
@@ -188,17 +242,21 @@ class ChromaticStaffVexFlow {
     }
     
     addNote(x, y, position) {
+        // Use automatic horizontal positioning instead of click position
+        const noteX = this.getNextNotePosition();
+        
         const note = {
-            x: x,
-            y: y,
+            x: noteX, // Use calculated position, not click position
+            y: position.y, // Use snapped Y position for pitch
             semitoneIndex: position.semitoneIndex,
             midiNote: position.midiNote,
             frequency: position.frequency,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            column: this.notes.length // Track column for ordering
         };
         
         this.notes.push(note);
-        console.log('Added note:', note); // Debug logging
+        console.log('Added note at column', note.column, ':', note); // Debug logging
         this.playNote(note.frequency);
         this.drawStaff(); // Redraw with new note
         
@@ -231,7 +289,9 @@ class ChromaticStaffVexFlow {
     
     clearNotes() {
         this.notes = [];
+        this.noteColumns = []; // Reset column tracking
         this.drawStaff();
+        console.log('Cleared all notes and reset positioning');
     }
     
     playSequence() {
